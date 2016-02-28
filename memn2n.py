@@ -173,7 +173,7 @@ challenges = {
     # QA2 with 10,000 samples
     'two_supporting_facts_10k': 'tasks_1-20_v1-2/en-10k/qa2_two-supporting-facts_{}.txt',
 }
-challenge_type = 'single_supporting_fact_10k'
+challenge_type = 'two_supporting_facts_10k' #'single_supporting_fact_10k'
 challenge = challenges[challenge_type] # challenge = 'single_supporting_fact_10k'
 
 print('Extracting stories for the challenge:', challenge_type)
@@ -203,8 +203,8 @@ print('Vectorizing the word sequences...')
 word_idx = dict((c, i + 1) for i, c in enumerate(vocab))
 inputs_train, queries_train, answers_train = vectorize_stories(train_stories, word_idx, story_maxlen, query_maxlen,story_maxnum)
 inputs_test, queries_test, answers_test = vectorize_stories(test_stories, word_idx, story_maxlen, query_maxlen,story_maxnum)
-inputs_test.resize((1000,100))
-inputs_train.resize((10000,100))
+inputs_test.resize((1000,story_maxlen*story_maxnum))
+inputs_train.resize((10000,story_maxlen*story_maxnum))
 print('-')
 print('inputs: integer tensor of shape (samples, max_length)')
 print('inputs_train shape:', inputs_train.shape)
@@ -226,8 +226,7 @@ input_encoder_m.add(Embedding(input_dim=vocab_size,
                               output_dim=64,
                               input_length=story_maxlen*story_maxnum),
                          )
-input_encoder_m.add(Dropout(0.1))
-input_encoder_m.add(Reshape(dims=(100,64)))
+input_encoder_m.add(Dropout(0.3))
 # output: (samples, story_maxlen*story_maxnum, embedding_dim)
 # output: (None, 100, 64)
 # embed the question into a sequence of vectors
@@ -236,11 +235,11 @@ question_encoder.add(Embedding(input_dim=vocab_size,
                                output_dim=64,
                                input_length=story_maxlen))
 question_encoder.add(Flatten())
-question_encoder.add(RepeatVector(10))
+question_encoder.add(RepeatVector(story_maxnum))
 # output: (None,story_maxlen* embedding_dim )
-question_encoder.add(Reshape(dims=(100,64)))
+question_encoder.add(Reshape(dims=(story_maxnum*story_maxlen,64)))
 # output: (None ,10,story_maxlen*embedding_dim)
-question_encoder.add(Dropout(0.1))
+question_encoder.add(Dropout(0.3))
 # compute a 'match' between input sequence elements (which are vectors)
 # and the question vector sequence
 match = Sequential()
@@ -258,8 +257,7 @@ input_encoder_c = Sequential()
 input_encoder_c.add(Embedding(input_dim=vocab_size,
                               output_dim=64,
                               input_length=story_maxlen*story_maxnum))
-input_encoder_c.add(Dropout(0.1))
-input_encoder_c.add(Reshape(dims=(100,64)))
+input_encoder_c.add(Dropout(0.3))
 # output: (samples, story_maxlen, embedding_dim)
 # output: (samples, story_maxlen, query_maxlen)
 # sum the match vector with the input vector:
