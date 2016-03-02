@@ -27,8 +27,8 @@ import tarfile
 import numpy as np
 import re
 from keras import backend as K
-"""
-class TimeDistributedMerge2D(TimeDistributedMerge):
+
+class TimeDistributedMerge2D(Layer):
     input_ndim = 3
     def __init__(self, mode='sum', dims='1',**kwargs):
 
@@ -58,10 +58,9 @@ class TimeDistributedMerge2D(TimeDistributedMerge):
             return s
         else:
             raise Exception('Unknown merge mode')
-"""
 class TimeDistributedMerge3D(Layer):
     input_ndim = 4
-    def __init__(self, mode='sum', dims='1',**kwargs):
+    def __init__(self, mode='sum', dims=1,**kwargs):
 
         super(TimeDistributedMerge3D, self).__init__(**kwargs)
         self.mode = mode
@@ -173,7 +172,7 @@ challenges = {
     # QA2 with 10,000 samples
     'two_supporting_facts_10k': 'tasks_1-20_v1-2/en-10k/qa2_two-supporting-facts_{}.txt',
 }
-challenge_type = 'two_supporting_facts_10k' #'single_supporting_fact_10k'
+challenge_type = 'single_supporting_fact_10k'
 challenge = challenges[challenge_type] # challenge = 'single_supporting_fact_10k'
 
 print('Extracting stories for the challenge:', challenge_type)
@@ -203,8 +202,9 @@ print('Vectorizing the word sequences...')
 word_idx = dict((c, i + 1) for i, c in enumerate(vocab))
 inputs_train, queries_train, answers_train = vectorize_stories(train_stories, word_idx, story_maxlen, query_maxlen,story_maxnum)
 inputs_test, queries_test, answers_test = vectorize_stories(test_stories, word_idx, story_maxlen, query_maxlen,story_maxnum)
-inputs_test.resize((1000,story_maxlen*story_maxnum))
-inputs_train.resize((10000,story_maxlen*story_maxnum))
+inputs_test.resize((1000,100))
+inputs_train.resize((10000,100))
+"""
 print('-')
 print('inputs: integer tensor of shape (samples, max_length)')
 print('inputs_train shape:', inputs_train.shape)
@@ -218,6 +218,7 @@ print('answers: binary (1 or 0) tensor of shape (samples, vocab_size)')
 print('answers_train shape:', answers_train.shape)
 print('answers_test shape:', answers_test.shape)
 print('-')
+"""
 print('Compiling...')
 # embed the input sequence into a sequence of vectors
 
@@ -226,7 +227,9 @@ input_encoder_m.add(Embedding(input_dim=vocab_size,
                               output_dim=64,
                               input_length=story_maxlen*story_maxnum),
                          )
-input_encoder_m.add(Dropout(0.3))
+input_encoder_m.add(Reshape(dims=(10,10,64)))
+input_encoder_m.add(TimeDistributedMerge3D(dims=2))
+input_encoder_m.add(Dropout(0.1))
 # output: (samples, story_maxlen*story_maxnum, embedding_dim)
 # output: (None, 100, 64)
 # embed the question into a sequence of vectors
@@ -234,22 +237,17 @@ question_encoder = Sequential()
 question_encoder.add(Embedding(input_dim=vocab_size,
                                output_dim=64,
                                input_length=story_maxlen))
-question_encoder.add(Flatten())
-question_encoder.add(RepeatVector(story_maxnum))
 # output: (None,story_maxlen* embedding_dim )
-question_encoder.add(Reshape(dims=(story_maxnum*story_maxlen,64)))
-# output: (None ,10,story_maxlen*embedding_dim)
-question_encoder.add(Dropout(0.3))
+question_encoder.add(Dropout(0.1))
 # compute a 'match' between input sequence elements (which are vectors)
 # and the question vector sequence
 match = Sequential()
 match.add(Merge([input_encoder_m, question_encoder],
                 mode='mul',))
                 #dot_axes=[(2,), (2,)]))
-
 #match.add(Permute((2, 1)))
 #match.add(Reshape(dims=(10,10,64)))
-
+#match.add(TimeDistributedMerge2D(dims=2))
 #match.add(Activation('softmax'))
 # output: (samples, story_maxlen, query_maxlen)
 # embed the input into a single vector with size = story_maxlen:
@@ -257,14 +255,16 @@ input_encoder_c = Sequential()
 input_encoder_c.add(Embedding(input_dim=vocab_size,
                               output_dim=64,
                               input_length=story_maxlen*story_maxnum))
-input_encoder_c.add(Dropout(0.3))
+input_encoder_c.add(Dropout(0.1))
+input_encoder_c.add(Reshape(dims=(10,10,64)))
+input_encoder_c.add(TimeDistributedMerge3D(dims=2))
 # output: (samples, story_maxlen, embedding_dim)
 # output: (samples, story_maxlen, query_maxlen)
 # sum the match vector with the input vector:
 response = Sequential()
 response.add(Merge([match, input_encoder_c],
                     mode='mul',))
-#                    dot_axes=[(2,), (2,)]))
+                    #dot_axes=[(1,), (1,)]))
 #response.add(TimeDistributedMerge3D(dims=1))
 # output: (samples, story_maxlen, query_maxlen)
 #response.add(Permute((2, 1)))  # output: (samples, query_maxlen, story_maxlen)
