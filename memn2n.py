@@ -239,16 +239,17 @@ question_encoder.add(Embedding(input_dim=vocab_size,
                                input_length=story_maxlen))
 # output: (None,story_maxlen* embedding_dim )
 question_encoder.add(Dropout(0.1))
+question.add(TimeDistributedMerge())
 # compute a 'match' between input sequence elements (which are vectors)
 # and the question vector sequence
 match = Sequential()
 match.add(Merge([input_encoder_m, question_encoder],
-                mode='mul',))
-                #dot_axes=[(2,), (2,)]))
+                mode='dot',
+                dot_axes=[(2,), (2,)]))
 #match.add(Permute((2, 1)))
 #match.add(Reshape(dims=(10,10,64)))
 #match.add(TimeDistributedMerge2D(dims=2))
-#match.add(Activation('softmax'))
+match.add(Activation('softmax'))
 # output: (samples, story_maxlen, query_maxlen)
 # embed the input into a single vector with size = story_maxlen:
 input_encoder_c = Sequential()
@@ -263,8 +264,8 @@ input_encoder_c.add(TimeDistributedMerge3D(dims=2))
 # sum the match vector with the input vector:
 response = Sequential()
 response.add(Merge([match, input_encoder_c],
-                    mode='mul',))
-                    #dot_axes=[(1,), (1,)]))
+                    mode='dot',
+                    dot_axes=[(1,), (1,)]))
 #response.add(TimeDistributedMerge3D(dims=1))
 # output: (samples, story_maxlen, query_maxlen)
 #response.add(Permute((2, 1)))  # output: (samples, query_maxlen, story_maxlen)
