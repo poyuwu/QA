@@ -172,7 +172,7 @@ challenges = {
     # QA2 with 10,000 samples
     'two_supporting_facts_10k': 'tasks_1-20_v1-2/en-10k/qa2_two-supporting-facts_{}.txt',
 }
-challenge_type = 'single_supporting_fact_10k'
+challenge_type = 'two_supporting_facts_10k'#'single_supporting_fact_10k'
 challenge = challenges[challenge_type] # challenge = 'single_supporting_fact_10k'
 
 print('Extracting stories for the challenge:', challenge_type)
@@ -202,8 +202,8 @@ print('Vectorizing the word sequences...')
 word_idx = dict((c, i + 1) for i, c in enumerate(vocab))
 inputs_train, queries_train, answers_train = vectorize_stories(train_stories, word_idx, story_maxlen, query_maxlen,story_maxnum)
 inputs_test, queries_test, answers_test = vectorize_stories(test_stories, word_idx, story_maxlen, query_maxlen,story_maxnum)
-inputs_test.resize((1000,100))
-inputs_train.resize((10000,100))
+inputs_test.resize((1000,story_maxlen*story_maxnum))
+inputs_train.resize((10000,story_maxlen*story_maxnum))
 """
 print('-')
 print('inputs: integer tensor of shape (samples, max_length)')
@@ -227,7 +227,7 @@ input_encoder_m.add(Embedding(input_dim=vocab_size,
                               output_dim=64,
                               input_length=story_maxlen*story_maxnum),
                          )
-input_encoder_m.add(Reshape(dims=(10,10,64)))
+input_encoder_m.add(Reshape(dims=(story_maxnum,story_maxlen,64)))
 input_encoder_m.add(TimeDistributedMerge3D(dims=2))
 input_encoder_m.add(Dropout(0.1))
 # output: (samples, story_maxlen*story_maxnum, embedding_dim)
@@ -257,7 +257,8 @@ input_encoder_c.add(Embedding(input_dim=vocab_size,
                               output_dim=64,
                               input_length=story_maxlen*story_maxnum))
 input_encoder_c.add(Dropout(0.1))
-input_encoder_c.add(Reshape(dims=(10,10,64)))
+input_encoder_c.add(Reshape(dims=(story_maxnum,story_maxlen
+	,64)))
 input_encoder_c.add(TimeDistributedMerge3D(dims=2))
 # output: (samples, story_maxlen, embedding_dim)
 # output: (samples, story_maxlen, query_maxlen)
