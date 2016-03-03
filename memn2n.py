@@ -238,14 +238,14 @@ question_encoder.add(Embedding(input_dim=vocab_size,
                                output_dim=64,
                                input_length=story_maxlen))
 # output: (None,story_maxlen* embedding_dim )
-question_encoder.add(Dropout(0.1))
 question_encoder.add(TimeDistributedMerge())
+question_encoder.add(Dropout(0.1))
 # compute a 'match' between input sequence elements (which are vectors)
 # and the question vector sequence
 match = Sequential()
 match.add(Merge([input_encoder_m, question_encoder],
                 mode='dot',
-                dot_axes=[(2,), (2,)]))
+                dot_axes=[(2,), (1,)]))
 #match.add(Permute((2, 1)))
 #match.add(Reshape(dims=(10,10,64)))
 #match.add(TimeDistributedMerge2D(dims=2))
@@ -279,7 +279,7 @@ answer = Sequential()
 answer.add(Merge([response, question_encoder], mode='sum'))#, concat_axis=-1))
 # the original paper uses a matrix multiplication for this reduction step.
 # we choose to use a RNN instead.
-answer.add(LSTM(32))
+#answer.add(LSTM(32))
 # one regularization layer -- more would probably be needed.
 answer.add(Dropout(0.3))
 answer.add(Dense(vocab_size))
