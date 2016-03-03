@@ -239,7 +239,7 @@ question_encoder.add(Embedding(input_dim=vocab_size,
                                input_length=story_maxlen))
 # output: (None,story_maxlen* embedding_dim )
 question_encoder.add(Dropout(0.1))
-question.add(TimeDistributedMerge())
+question_encoder.add(TimeDistributedMerge())
 # compute a 'match' between input sequence elements (which are vectors)
 # and the question vector sequence
 match = Sequential()
