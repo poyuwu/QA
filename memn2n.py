@@ -172,7 +172,7 @@ challenges = {
     # QA2 with 10,000 samples
     'two_supporting_facts_10k': 'tasks_1-20_v1-2/en-10k/qa2_two-supporting-facts_{}.txt',
 }
-challenge_type = 'two_supporting_facts_10k'#'single_supporting_fact_10k'
+challenge_type = 'single_supporting_fact_10k'
 challenge = challenges[challenge_type] # challenge = 'single_supporting_fact_10k'
 
 print('Extracting stories for the challenge:', challenge_type)
@@ -228,7 +228,7 @@ input_encoder_m.add(Embedding(input_dim=vocab_size,
                               input_length=story_maxlen*story_maxnum),
                          )
 input_encoder_m.add(Reshape(dims=(story_maxnum,story_maxlen,64)))
-input_encoder_m.add(TimeDistributedMerge3D(dims=2))
+input_encoder_m.add(TimeDistributedMerge3D(mode='sum',dims=2))
 input_encoder_m.add(Dropout(0.1))
 # output: (samples, story_maxlen*story_maxnum, embedding_dim)
 # output: (None, 100, 64)
@@ -238,35 +238,33 @@ question_encoder.add(Embedding(input_dim=vocab_size,
                                output_dim=64,
                                input_length=story_maxlen))
 # output: (None,story_maxlen* embedding_dim )
-question_encoder.add(TimeDistributedMerge())
+#question_encoder.add(TimeDistributedMerge())
 question_encoder.add(Dropout(0.1))
 # compute a 'match' between input sequence elements (which are vectors)
 # and the question vector sequence
 match = Sequential()
 match.add(Merge([input_encoder_m, question_encoder],
-                mode='dot',
-                dot_axes=[(2,), (1,)]))
+                mode='mul',))
+                #dot_axes=[(2,), (1,)]))
 #match.add(Permute((2, 1)))
 #match.add(Reshape(dims=(10,10,64)))
 #match.add(TimeDistributedMerge2D(dims=2))
-match.add(Activation('softmax'))
 # output: (samples, story_maxlen, query_maxlen)
 # embed the input into a single vector with size = story_maxlen:
 input_encoder_c = Sequential()
 input_encoder_c.add(Embedding(input_dim=vocab_size,
                               output_dim=64,
                               input_length=story_maxlen*story_maxnum))
+input_encoder_c.add(Reshape(dims=(story_maxnum,story_maxlen,64)))
+input_encoder_c.add(TimeDistributedMerge3D(mode='sum',dims=2))
 input_encoder_c.add(Dropout(0.1))
-input_encoder_c.add(Reshape(dims=(story_maxnum,story_maxlen
-	,64)))
-input_encoder_c.add(TimeDistributedMerge3D(dims=2))
 # output: (samples, story_maxlen, embedding_dim)
 # output: (samples, story_maxlen, query_maxlen)
 # sum the match vector with the input vector:
 response = Sequential()
 response.add(Merge([match, input_encoder_c],
-                    mode='dot',
-                    dot_axes=[(1,), (1,)]))
+                    mode='mul',))
+                    #dot_axes=[(1,), (1,)]))
 #response.add(TimeDistributedMerge3D(dims=1))
 # output: (samples, story_maxlen, query_maxlen)
 #response.add(Permute((2, 1)))  # output: (samples, query_maxlen, story_maxlen)
@@ -279,7 +277,7 @@ answer = Sequential()
 answer.add(Merge([response, question_encoder], mode='sum'))#, concat_axis=-1))
 # the original paper uses a matrix multiplication for this reduction step.
 # we choose to use a RNN instead.
-#answer.add(LSTM(32))
+answer.add(LSTM(32))
 # one regularization layer -- more would probably be needed.
 answer.add(Dropout(0.3))
 answer.add(Dense(vocab_size))
@@ -289,6 +287,6 @@ answer.compile(optimizer='rmsprop', loss='categorical_crossentropy')
 # Note: you could use a Graph model to avoid repeat the input twice
 answer.fit([inputs_train, queries_train, inputs_train], answers_train,
            batch_size=32,
-           nb_epoch=600,
+           nb_epoch=300,
            show_accuracy=True,
            validation_data=([inputs_test, queries_test, inputs_test], answers_test))
